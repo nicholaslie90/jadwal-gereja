@@ -1,0 +1,64 @@
+name: Build jadwal
+
+on:
+  schedule:
+    - cron: "0 22 * * *" # 05:00 WIB
+  workflow_dispatch:
+    inputs:
+      test_notify:
+        description: "Kirim notifikasi percobaan untuk tugas terdekat"
+        type: boolean
+        default: false
+
+concurrency:
+  group: build-jadwal
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Selftest kripto
+        run: node scripts/encrypt.mjs --selftest
+
+      - name: Tarik & parse spreadsheet
+        run: python3 scripts/fetch_parse.py > plain.json
+
+      # Gagal di sini = data.json lama tetap tayang, bukan diganti payload rusak.
+      - name: Cek hasil parse
+        run: python3 scripts/test_parse.py plain.json
+
+      - name: Enkripsi payload
+        env:
+          PAGE_PASSWORD: ${{ secrets.PAGE_PASSWORD }}
+        run: node scripts/encrypt.mjs plain.json docs/data.json
+
+      - name: Commit kalau jadwal berubah
+        run: |
+          if git diff --quiet -- docs/data.json; then
+            echo "tidak ada perubahan jadwal"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data.json
+          git commit -m "chore: update jadwal $(date -u +%Y-%m-%d)"
+          git push
+
+      - name: Notifikasi ntfy
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          # Lewat env, bukan interpolasi langsung ke dalam `run` — itu pola
+          # script injection walau input-nya boolean.
+          TEST_NOTIFY: ${{ inputs.test_notify }}
+        run: |
+          if [ "$TEST_NOTIFY" = "true" ]; then
+            python3 scripts/notify.py plain.json --test
+          else
+            python3 scripts/notify.py plain.json
+          fi

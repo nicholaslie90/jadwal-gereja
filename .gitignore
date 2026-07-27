@@ -1,0 +1,3 @@
+# Plaintext roster -- only the encrypted docs/data.json belongs in git.
+plain.json
+*.xlsx
