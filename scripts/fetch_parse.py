@@ -46,6 +46,11 @@ MONTH_TOKENS = sorted(
     key=lambda kv: -len(kv[0]),
 )
 
+# The sheet's HARI column names the weekday; GYS names the Sabbath service.
+SABAT = {
+    "Jumat": "Sabat Malam", "Sabtu Pagi": "Sabat Pagi", "Sabtu Siang": "Sabat Sore",
+}
+
 # Verified across all 71 tabs: "Nicholas X" / "Nicholas Xie" is a different person
 # and always sits in the PUJIAN column. Strip those before matching me.
 NOT_ME = re.compile(r"\bnic(?:h)?olas\s+xie?\b", re.I)
@@ -230,10 +235,16 @@ def parse(blob, today):
         blocks = []
         for name, headers, cols, header_row in find_blocks(grid):
             rows = []
+            hari = next((c for h, c in zip(headers, cols) if h.upper() == "HARI"), None)
             for cells in read_block(grid, cols, header_row):
                 when = parse_date(cells.get(cols[0], ""), year, month)
                 if not when:
                     continue
+                # Rewrite once here so the table, the page and the notification
+                # all say Sabat rather than each fixing it up on its own.
+                sabat = SABAT.get(cells.get(hari, "").strip().title())
+                if sabat:
+                    cells[hari] = sabat
                 values = [cells.get(c, "") for c in cols[1:]]
                 rows.append({"date": when.isoformat(), "cells": values})
                 collect_mine(mine, name, label, headers, cols, cells, when)

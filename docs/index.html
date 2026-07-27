@@ -409,7 +409,7 @@ function renderMine(upcoming, past) {
 function renderAll(data) {
   const host = document.getElementById("panel-all");
   host.replaceChildren();
-  // Keyed on the day too: Sabtu Pagi and Sabtu Siang share a date, and only the
+  // Keyed on the day too: Sabat Pagi and Sabat Sore share a date, and only the
   // service we actually serve in should light up.
   const ours = new Set(data.mine.map((d) => `${d.date}|${d.day}|${d.block}`));
   for (const month of data.months) {

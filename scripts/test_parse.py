@@ -31,6 +31,8 @@ def main(path):
         assert when >= floor, f"{d['date']} predates the current month"
         assert d["who"] in ("Nicholas", "Cindy"), f"unexpected person {d['who']!r}"
         assert d["role"], f"duty on {d['date']} has no role"
+        assert not d["day"].startswith(("Sabtu", "Jumat")), \
+            f"{d['date']}: weekday {d['day']!r} not rewritten to Sabat"
         assert not BAD_ME.search(d["raw"]), f"matched Nicholas Xie in {d['raw']!r}"
         if d["who"] == "Cindy":
             assert not BAD_WIFE.search(d["raw"]), f"matched Cindiana in {d['raw']!r}"
