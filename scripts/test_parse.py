@@ -56,22 +56,12 @@ def main(path):
 
 
 def check_guests(mine):
-    """Whoever is on duty must land in the Google Calendar guest list."""
+    """Every event invites both of us, whoever is on duty."""
     for d in mine:
         q = parse_qs(urlparse(calendar_url([d])).query)
-        assert q["add"] == [GUESTS[d["who"]]], \
+        assert q["add"][0].split(",") == GUESTS, \
             f"{d['date']} {d['who']}: guest list is {q.get('add')}"
-
-    # A slot both of them serve invites both, once each.
-    both = [d for d in mine if any(
-        o["date"] == d["date"] and o["day"] == d["day"] and o["who"] != d["who"]
-        for o in mine)]
-    if both:
-        same_slot = [d for d in both if d["date"] == both[0]["date"]
-                     and d["day"] == both[0]["day"]]
-        guests = parse_qs(urlparse(calendar_url(same_slot)).query)["add"][0].split(",")
-        assert sorted(guests) == sorted(GUESTS.values()), f"joint slot guests: {guests}"
-        print(f"guests ok: {both[0]['date']} invites {', '.join(sorted(guests))}")
+    print(f"guests ok: every event invites {', '.join(GUESTS)}")
 
 
 if __name__ == "__main__":

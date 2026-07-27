@@ -33,8 +33,9 @@ ROLE_LABEL = {
     "PENYAMBUT TAMU (LT.1)": "Penyambut Tamu (Lt. 1)",
 }
 
-# Added to the Google Calendar guest list for whoever is on duty.
-GUESTS = {"Nicholas": "nicholaslie90@gmail.com", "Cindy": "cindy.wijaya15@gmail.com"}
+# Both always land in the Google Calendar guest list -- we go to church
+# together, so each of us wants the event even when only one is on duty.
+GUESTS = ["nicholaslie90@gmail.com", "cindy.wijaya15@gmail.com"]
 
 
 def role(name):
@@ -66,12 +67,8 @@ def calendar_url(items):
         "location": CHURCH,
         "details": f"{first['block']}\n{roles}\n\n{MAPS}",
         "dates": dates,
+        "add": ",".join(GUESTS),
     }
-    guests = list(dict.fromkeys(
-        GUESTS[i["who"]] for i in items if i["who"] in GUESTS
-    ))
-    if guests:
-        params["add"] = ",".join(guests)
     return "https://calendar.google.com/calendar/render?" + urlencode(params)
 
 

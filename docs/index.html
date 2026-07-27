@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#00529b">
 <title>Jadwal Pelayanan · GYS Tanjung Duren</title>
-<link rel="icon" href="logo.png">
+<link rel="icon" href="favicon.png">
 <style>
 :root{
   --teal:#00a2b1; --teal-dark:#008795; --blue:#00529b; --blue-dark:#003f77;
@@ -234,9 +234,10 @@ const CHURCH = "Gereja Yesus Sejati (GYS) Tanjung Duren";
 const MAPS = "https://maps.app.goo.gl/YJafmvMSeuE1cbzCA";
 const WIB_OFFSET = 7;
 
-// Whoever opens the page is adding the event to their own calendar, so inviting
-// both keeps each other in the loop; your own address is a no-op for Google.
-const GUEST = { Nicholas: "nicholaslie90@gmail.com", Cindy: "cindy.wijaya15@gmail.com" };
+// Always invite both -- we go to church together, so the other one wants the
+// event on their calendar too even when only one of us is on duty. Your own
+// address is a no-op for Google.
+const GUESTS = ["nicholaslie90@gmail.com", "cindy.wijaya15@gmail.com"];
 
 const ROLE_LABEL = {
   "P'BICARA":"Pembicara", "P’BICARA":"Pembicara", "PEMBICARA":"Pembicara",
@@ -269,9 +270,8 @@ function calendarUrl(items) {
     location: CHURCH,
     details: `${first.block}${first.day ? " · " + first.day : ""}\n${roles}\n\n${MAPS}`,
     dates: dateRange(first),
+    add: GUESTS.join(","),
   });
-  const guests = [...new Set(items.map((i) => GUEST[i.who]).filter(Boolean))];
-  if (guests.length) p.set("add", guests.join(","));
   return "https://calendar.google.com/calendar/render?" + p;
 }
 function dateRange(item) {
