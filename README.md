@@ -65,6 +65,20 @@ Mau lebih kuat? Ganti `PAGE_PASSWORD` jadi passphrase 4 kata — tanpa ubah kode
 Setelah password benar sekali, tersimpan di `localStorage` browser itu, jadi
 kunjungan berikutnya langsung terbuka. Tombol 🔒 di kanan atas untuk mengunci lagi.
 
+## Google Calendar guest list
+
+Tombol *Tambahkan ke Google Calendar* (di halaman maupun di notifikasi ntfy)
+otomatis mengisi guest list sesuai siapa yang bertugas:
+
+| Bertugas | Guest yang ditambahkan |
+| --- | --- |
+| Nicholas | nicholaslie90@gmail.com |
+| Cindy | cindy.wijaya15@gmail.com |
+
+Kalau keduanya bertugas di ibadah yang sama, dua-duanya diundang. Alamat Anda
+sendiri jadi no-op bagi Google, jadi efeknya: siapa pun yang membuat event,
+yang satunya tetap dapat undangan.
+
 ## Pemetaan nama
 
 Sudah diverifikasi terhadap seluruh 71 tab spreadsheet:

@@ -234,6 +234,10 @@ const CHURCH = "Gereja Yesus Sejati (GYS) Tanjung Duren";
 const MAPS = "https://maps.app.goo.gl/YJafmvMSeuE1cbzCA";
 const WIB_OFFSET = 7;
 
+// Whoever opens the page is adding the event to their own calendar, so inviting
+// both keeps each other in the loop; your own address is a no-op for Google.
+const GUEST = { Nicholas: "nicholaslie90@gmail.com", Cindy: "cindy.wijaya15@gmail.com" };
+
 const ROLE_LABEL = {
   "P'BICARA":"Pembicara", "P’BICARA":"Pembicara", "PEMBICARA":"Pembicara",
   "PUJIAN":"Pujian", "PEMUSIK":"Pemusik", "PENCATAT":"Pencatat", "ABSENSI":"Absensi",
@@ -266,6 +270,8 @@ function calendarUrl(items) {
     details: `${first.block}${first.day ? " · " + first.day : ""}\n${roles}\n\n${MAPS}`,
     dates: dateRange(first),
   });
+  const guests = [...new Set(items.map((i) => GUEST[i.who]).filter(Boolean))];
+  if (guests.length) p.set("add", guests.join(","));
   return "https://calendar.google.com/calendar/render?" + p;
 }
 function dateRange(item) {

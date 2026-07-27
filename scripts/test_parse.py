@@ -9,6 +9,9 @@ import json
 import re
 import sys
 from datetime import date
+from urllib.parse import parse_qs, urlparse
+
+from notify import GUESTS, calendar_url
 
 BAD_ME = re.compile(r"\bnic(?:h)?olas\s+xie?\b", re.I)   # a different person
 BAD_WIFE = re.compile(r"\bcindiana?\b", re.I)            # Eric's wife
@@ -47,8 +50,28 @@ def main(path):
                 assert len(r["cells"]) == len(b["headers"]) - 1, \
                     f"{m['label']}/{b['name']}: row width does not match headers"
 
+    check_guests(mine)
     print(f"ok: {len(mine)} duties across {len(months)} months "
           f"({', '.join(m['label'] for m in months)})")
+
+
+def check_guests(mine):
+    """Whoever is on duty must land in the Google Calendar guest list."""
+    for d in mine:
+        q = parse_qs(urlparse(calendar_url([d])).query)
+        assert q["add"] == [GUESTS[d["who"]]], \
+            f"{d['date']} {d['who']}: guest list is {q.get('add')}"
+
+    # A slot both of them serve invites both, once each.
+    both = [d for d in mine if any(
+        o["date"] == d["date"] and o["day"] == d["day"] and o["who"] != d["who"]
+        for o in mine)]
+    if both:
+        same_slot = [d for d in both if d["date"] == both[0]["date"]
+                     and d["day"] == both[0]["day"]]
+        guests = parse_qs(urlparse(calendar_url(same_slot)).query)["add"][0].split(",")
+        assert sorted(guests) == sorted(GUESTS.values()), f"joint slot guests: {guests}"
+        print(f"guests ok: {both[0]['date']} invites {', '.join(sorted(guests))}")
 
 
 if __name__ == "__main__":
