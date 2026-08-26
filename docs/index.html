@@ -182,13 +182,14 @@ tr.ours{background:var(--ours)}
 tr.ours td:first-child{box-shadow:inset 3px 0 0 var(--teal)}
 
 /* Ibadah is the only block wide enough to scroll sideways; pin Tanggal + Hari.
-   Col 1 is width-pinned because col 2's `left` has to be a number.
-   ponytail: hardcoded 76px, measure in JS if the font or date format changes. */
+   --c1 is the measured width of the Tanggal column (see pinFrozen); a hardcoded
+   offset drifts with the device font and lets the scrolled columns bleed
+   through the seam. The half pixel back is anti-hairline, nothing else. */
 .frozen :is(th,td):nth-child(-n+2){position:sticky; z-index:2; background:var(--card)}
 .frozen th:nth-child(-n+2){background:#f7fafc; z-index:4}
 .frozen tr.ours td:nth-child(-n+2){background:var(--ours)}
-.frozen :is(th,td):nth-child(1){left:0; width:76px; max-width:76px}
-.frozen :is(th,td):nth-child(2){left:76px; box-shadow:2px 0 0 var(--line)}
+.frozen :is(th,td):nth-child(1){left:0}
+.frozen :is(th,td):nth-child(2){left:calc(var(--c1,76px) - .5px); box-shadow:2px 0 0 var(--line)}
 mark{background:rgba(0,162,177,.28); color:inherit; border-radius:4px; padding:1px 3px; font-weight:700}
 footer{margin-top:26px; text-align:center; font-size:.6875rem; color:var(--muted)}
 footer a{color:var(--teal-dark)}
@@ -437,13 +438,27 @@ function renderAll(data) {
         for (const cell of r.cells) tr.append(el("td", {}, highlight(cell)));
         return tr;
       }));
+      const table = el("table", { class: block.name === "Ibadah" ? "frozen" : null }, [thead, tbody]);
       host.append(el("div", { class: "blockcard" }, [
         el("h3", { text: block.name }),
-        el("div", { class: "scroller" }, el("table", { class: block.name === "Ibadah" ? "frozen" : null }, [thead, tbody])),
+        el("div", { class: "scroller" }, table),
       ]));
     }
   }
+  syncFrozen();
 }
+
+// The frozen HARI column has to start exactly where the TANGGAL column ends,
+// and that width moves with the device font and the browser's text scaling --
+// a hardcoded offset leaves a seam the scrolled columns bleed through. A hidden
+// panel measures 0, hence the rerun on tab switch. (ResizeObserver looks like
+// the tidy answer but never fires for display:table-cell in Chrome.)
+function syncFrozen() {
+  for (const t of document.querySelectorAll("table.frozen")) {
+    t.style.setProperty("--c1", t.rows[0].cells[0].getBoundingClientRect().width + "px");
+  }
+}
+addEventListener("resize", syncFrozen);
 
 // Highlight our names inside a cell without ever building HTML from sheet text.
 const NAME_RE = /nic(?:h)?olas(?:\s+xie?\b)?|cindy/gi;
@@ -467,6 +482,7 @@ for (const key of ["mine", "all"]) {
       document.getElementById("tab-" + k).setAttribute("aria-selected", String(k === key));
       document.getElementById("panel-" + k).hidden = k !== key;
     }
+    syncFrozen();
   });
 }
 
