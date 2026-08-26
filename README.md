@@ -9,7 +9,7 @@ Sheets jadwal pelayanan gereja.
 ## Cara kerja
 
 ```
-cron 05:00 WIB
+cron 12:00 WIB
   │
   ├─ fetch_parse.py  Google Sheets (.xlsx) → plain.json
   ├─ test_parse.py   gagal ⇒ berhenti, data.json lama tetap tayang

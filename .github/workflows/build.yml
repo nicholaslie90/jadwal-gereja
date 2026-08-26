@@ -2,7 +2,7 @@ name: Build jadwal
 
 on:
   schedule:
-    - cron: "0 22 * * *" # 05:00 WIB
+    - cron: "0 5 * * *" # 12:00 WIB
   workflow_dispatch:
     inputs:
       test_notify:
