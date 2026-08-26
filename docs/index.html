@@ -11,6 +11,7 @@
 :root{
   --teal:#00a2b1; --teal-dark:#008795; --blue:#00529b; --blue-dark:#003f77;
   --ink:#0f2233; --muted:#5d7286; --line:#e2e9ef; --bg:#f2f6f9; --card:#fff;
+  --ours:#edf8fa; /* rgba(0,162,177,.07) over --card, flattened: sticky cells need an opaque fill */
   --radius:16px;
   --shadow:0 1px 2px rgba(15,34,51,.06), 0 8px 24px -12px rgba(15,34,51,.18);
 }
@@ -173,12 +174,21 @@ table{border-collapse:collapse; font-size:.8125rem; min-width:100%}
 th,td{padding:9px 11px; text-align:left; white-space:nowrap; border-bottom:1px solid var(--line)}
 th{
   font-size:.625rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
-  color:var(--muted); background:#f7fafc; position:sticky; top:0;
+  color:var(--muted); background:#f7fafc; position:sticky; top:0; z-index:3;
 }
 tbody tr:last-child td{border-bottom:0}
 td.day{font-weight:650}
-tr.ours{background:rgba(0,162,177,.07)}
+tr.ours{background:var(--ours)}
 tr.ours td:first-child{box-shadow:inset 3px 0 0 var(--teal)}
+
+/* Ibadah is the only block wide enough to scroll sideways; pin Tanggal + Hari.
+   Col 1 is width-pinned because col 2's `left` has to be a number.
+   ponytail: hardcoded 76px, measure in JS if the font or date format changes. */
+.frozen :is(th,td):nth-child(-n+2){position:sticky; z-index:2; background:var(--card)}
+.frozen th:nth-child(-n+2){background:#f7fafc; z-index:4}
+.frozen tr.ours td:nth-child(-n+2){background:var(--ours)}
+.frozen :is(th,td):nth-child(1){left:0; width:76px; max-width:76px}
+.frozen :is(th,td):nth-child(2){left:76px; box-shadow:2px 0 0 var(--line)}
 mark{background:rgba(0,162,177,.28); color:inherit; border-radius:4px; padding:1px 3px; font-weight:700}
 footer{margin-top:26px; text-align:center; font-size:.6875rem; color:var(--muted)}
 footer a{color:var(--teal-dark)}
@@ -429,7 +439,7 @@ function renderAll(data) {
       }));
       host.append(el("div", { class: "blockcard" }, [
         el("h3", { text: block.name }),
-        el("div", { class: "scroller" }, el("table", {}, [thead, tbody])),
+        el("div", { class: "scroller" }, el("table", { class: block.name === "Ibadah" ? "frozen" : null }, [thead, tbody])),
       ]));
     }
   }
