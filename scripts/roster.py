@@ -20,7 +20,8 @@ import urllib.request
 from collections import Counter, defaultdict
 from datetime import date, timedelta
 
-from fetch_parse import EXPORT_URL, Workbook, find_blocks, parse_date, read_block, sheet_month
+from fetch_parse import (EXPORT_URL, MONTHS, Workbook, find_blocks, parse_date,
+                         read_block, sheet_month)
 
 # Rules are read off the recent past only -- 2025's pools are stale.
 WINDOW = 9          # months of history feeding the pools
@@ -66,11 +67,11 @@ def split_cell(text):
     for part in re.split(r"\s*(?:&|,|/| dan )\s*", text):
         who = canon(part)
         if who:
-            yield who
+            yield who, part.strip()
 
 
 def history(blob):
-    """Every assignment in the sheet as (date, slot, role, person, jam)."""
+    """Every assignment as (date, slot, role, person, jam, spelling-in-sheet)."""
     wb = Workbook(blob)
     out = []
     for tab, path in wb.sheets:
@@ -104,8 +105,37 @@ def history(blob):
                     if role in SKIP:
                         continue
                     role = "PENYAMBUT TAMU" if role.startswith("PENYAMBUT") else role
-                    for who in split_cell(cells.get(col, "")):
-                        out.append((when, slot, role, who, jam))
+                    for who, raw in split_cell(cells.get(col, "")):
+                        out.append((when, slot, role, who, jam, raw))
+    return out
+
+
+def layout(blob):
+    """The newest month tab's shape: title, header row, side-table placement.
+
+    A draft has to paste into the sheet without reformatting, so the columns
+    (including the repeated PENYAMBUT TAMU / PETUGAS SNACK pair) are copied
+    from the last month rather than invented here.
+    """
+    blob.seek(0)
+    wb = Workbook(blob)
+    latest = None
+    for tab, path in wb.sheets:
+        grid = wb.grid(path)
+        ym = sheet_month(grid, tab)
+        if ym and (latest is None or ym > latest[0]):
+            latest = (ym, grid)
+    (_year, _month), grid = latest
+    out = {"title": grid[0].get(1, ""), "header": [], "side": []}
+    for block, headers, cols, header_row in find_blocks(grid):
+        if block == "Ibadah":
+            out["header"] = [(h, c) for h, c in zip(headers, cols)]
+            continue
+        when = grid[header_row - 2].get(cols[0], "")
+        out["side"].append({
+            "label": block, "when": when,
+            "cols": [(h, c) for h, c in zip(headers, cols)],
+        })
     return out
 
 
@@ -123,7 +153,7 @@ def derive(blob):
     # are actually still being filled. This is what drops Konsumsi/Snack from
     # the Sabtu services after the June 2026 layout change.
     per_cell, services = defaultdict(Counter), defaultdict(set)
-    for when, slot, role, _who, _jam in late:
+    for when, slot, role, _who, _jam, _raw in late:
         per_cell[(slot, role)][when] += 1
         services[slot].add(when)
     template, order = defaultdict(dict), {}
@@ -133,7 +163,12 @@ def derive(blob):
         template[slot][role] = Counter(seen.values()).most_common(1)[0][0]
 
     pools, rate, last_served, jam = defaultdict(lambda: defaultdict(Counter)), Counter(), {}, {}
-    for when, slot, role, who, when_jam in recent:
+    # Spelling drifts ("Dkn Othniel" -> "Dk. Othniel"), so follow the newest months.
+    spelling, recent_spelling = defaultdict(Counter), defaultdict(Counter)
+    for _w, _s, _r, who, _j, raw in late:
+        spelling[who][raw] += 1
+    for when, slot, role, who, when_jam, raw in recent:
+        recent_spelling[who][raw] += 1
         pools[slot][role][who] += 1
         rate[who] += 1
         last_served[who] = max(last_served.get(who, when), when)
@@ -154,7 +189,7 @@ def derive(blob):
 
     pairs = Counter()
     cell = defaultdict(set)
-    for when, slot, role, who, _jam in recent:
+    for when, slot, role, who, _jam, _raw in recent:
         cell[(when, slot, role)].add(who)
     for names in cell.values():
         for a in sorted(names):
@@ -168,12 +203,13 @@ def derive(blob):
     # Who may be booked in two different services on one day -- only the people
     # who already do it. Two roles inside one service is handled separately.
     day_slots = defaultdict(set)
-    for when, slot, _role, who, _jam in recent:
+    for when, slot, _role, who, _jam, _raw in recent:
         if slot in SERVICES:
             day_slots[(who, when)].add(slot)
     multislot = sorted({who for (who, _d), slots in day_slots.items() if len(slots) > 1})
     return {
         "derived": date.today().isoformat(),
+        "layout": layout(blob),
         "history_through": last.isoformat(),
         "months": [f"{y}-{m:02d}" for y, m in months],
         "columns": ["TGL", "HARI", "JAM"] + [
@@ -184,6 +220,9 @@ def derive(blob):
         "jam": {s: c.most_common(1)[0][0] for s, c in jam.items()},
         "template": {s: template[s] for s in list(SERVICES) + list(SIDE) if s in template},
         "retired": sorted(retired),
+        # Written back with the sheet's own spelling, gelar and all.
+        "display": {w: (spelling[w] or c).most_common(1)[0][0]
+                    for w, c in recent_spelling.items() if w not in retired},
         "pools": {s: {r: dict(c.most_common()) for r, c in roles.items()}
                   for s, roles in pools.items()},
         "pairs": sorted(p for p in duo if not set(p) & retired),
@@ -271,24 +310,74 @@ def best(pool, blocked, when, quota, filled, counts, last, cap, slot, role):
     return max(ranked)[3]
 
 
-def to_tsv(rules, schedule):
-    cols = rules["columns"]
-    lines = []
+def show(rules, who):
+    return rules.get("display", {}).get(who, who)
+
+
+def role_of(header):
+    role = header.upper().replace("\u2019", "'").strip()
+    return "PENYAMBUT TAMU" if role.startswith("PENYAMBUT") else role
+
+
+def spread(names, columns):
+    """Names into however many columns the sheet gives that role."""
+    if len(names) <= len(columns):
+        return dict(zip(columns, names))
+    keep = len(columns) - 1
+    return dict(zip(columns, names[:keep] + [" & ".join(names[keep:])]))
+
+
+def to_tsv(rules, schedule, year, month):
+    """The draft in the newest tab's own layout -- paste straight into Sheets."""
+    lay = rules["layout"]
+    grid, width = [], 1
+
+    def put(cells):
+        nonlocal width
+        width = max(width, max(cells, default=1))
+        grid.append(cells)
+
+    put({1: re.sub(r"BULAN\s+[A-Z]+\s*\d{4}", f"BULAN {MONTHS[month].upper()} {year}",
+                   lay["title"], flags=re.I)})
+    put({col: head for head, col in lay["header"]})
+    put({})
+    columns = defaultdict(list)
+    for head, col in lay["header"]:
+        columns[role_of(head)].append(col)
     for slot, when, picks in schedule:
         if slot in SIDE:
             continue
-        row = [str(when.day), slot, rules["jam"].get(slot, "")]
-        row += [" & ".join(picks.get(c, [])) for c in cols[3:]]
-        lines.append("\t".join(row))
-    for slot in SIDE:
-        rows = [(w, p) for s, w, p in schedule if s == slot]
-        if not rows:
-            continue
-        roles = list(rules["template"][slot])
-        lines += ["", slot, "\t".join(["TGL"] + roles)]
-        lines += ["\t".join([str(w.day)] + [" & ".join(p.get(r, [])) for r in roles])
-                  for w, p in rows]
-    return "\n".join(lines)
+        row = {columns["TGL"][0]: when.isoformat(),
+               columns["HARI"][0]: slot,
+               columns["JAM"][0]: rules["jam"].get(slot, "")}
+        for role, names in picks.items():
+            row.update(spread([show(rules, n) for n in names], columns.get(role, [])))
+        put(row)
+    put({})
+
+    side = [b for b in lay["side"] if b["label"] in rules["template"]]
+    labels, whens, heads = {}, {}, {}
+    for block in side:
+        first = block["cols"][0][1]
+        labels[first] = block["label"]
+        whens[first] = block["when"]
+        heads.update({col: head for head, col in block["cols"]})
+    put(labels), put(whens), put(heads)
+    for i in range(max((len([1 for s, _w, _p in schedule if s == b["label"]])
+                        for b in side), default=0)):
+        row = {}
+        for block in side:
+            rows = [(w, p) for s, w, p in schedule if s == block["label"]]
+            if i >= len(rows):
+                continue
+            when, picks = rows[i]
+            for head, col in block["cols"]:
+                row[col] = when.isoformat() if head.upper() == "TGL" else \
+                    " & ".join(show(rules, n) for n in picks.get(role_of(head), []))
+        put(row)
+
+    return "\n".join("\t".join(row.get(c, "") for c in range(1, width + 1)).rstrip("\t")
+                     for row in grid)
 
 
 def selftest(rules):
@@ -330,7 +419,7 @@ def main(argv):
     elif argv[:1] == ["draft"] and len(argv) > 1:
         year, month = (int(x) for x in argv[1].split("-"))
         rules = load_rules(argv[2] if len(argv) > 2 else "rules.json")
-        print(to_tsv(rules, draft(rules, year, month)))
+        print(to_tsv(rules, draft(rules, year, month), year, month))
     elif argv[:1] == ["--selftest"]:
         selftest(load_rules(argv[1] if len(argv) > 1 else "rules.json"))
     else:
