@@ -8,6 +8,7 @@ rules.json by hand to override anything (pools, rates, pairs, headcounts).
 Usage:
     python3 scripts/roster.py derive [sheet.xlsx] > rules.json
     python3 scripts/roster.py draft 2026-10 [rules.json]   # TSV, paste into Sheets
+    python3 scripts/roster.py xlsx  2026-10 [rules.json] [out.xlsx]
     python3 scripts/roster.py --selftest
 """
 
@@ -16,7 +17,9 @@ import io
 import json
 import re
 import sys
+import tempfile
 import urllib.request
+import zipfile
 from collections import Counter, defaultdict
 from datetime import date, timedelta
 
@@ -327,7 +330,7 @@ def spread(names, columns):
     return dict(zip(columns, names[:keep] + [" & ".join(names[keep:])]))
 
 
-def to_tsv(rules, schedule, year, month):
+def to_grid(rules, schedule, year, month):
     """The draft in the newest tab's own layout -- paste straight into Sheets."""
     lay = rules["layout"]
     grid, width = [], 1
@@ -376,12 +379,65 @@ def to_tsv(rules, schedule, year, month):
                     " & ".join(show(rules, n) for n in picks.get(role_of(head), []))
         put(row)
 
-    return "\n".join("\t".join(row.get(c, "") for c in range(1, width + 1)).rstrip("\t")
-                     for row in grid)
+    return [[row.get(c, "") for c in range(1, width + 1)] for row in grid]
+
+
+def to_tsv(grid):
+    return "\n".join("\t".join(row).rstrip("\t") for row in grid)
+
+
+def to_xlsx(grid, path, title):
+    """Write a one-sheet workbook. An .xlsx is a zip of XML and every cell here
+    is an inline string, so this needs no library -- same trade as the reader."""
+    def ref(row, col):
+        name = ""
+        while col:
+            col, rest = divmod(col - 1, 26)
+            name = chr(65 + rest) + name
+        return f"{name}{row}"
+
+    def esc(text):
+        return (text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+
+    rows = "".join(
+        f'<row r="{r}">' + "".join(
+            f'<c r="{ref(r, c)}" t="inlineStr"><is><t xml:space="preserve">{esc(v)}</t></is></c>'
+            for c, v in enumerate(cells, 1) if v
+        ) + "</row>"
+        for r, cells in enumerate(grid, 1)
+    )
+    ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    rel = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+    parts = {
+        "[Content_Types].xml":
+            '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-'
+            'officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml"'
+            ' ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
+        "_rels/.rels":
+            f'<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/'
+            f'relationships"><Relationship Id="rId1" Type="{rel}/officeDocument" Target="xl/workbook.xml"/>'
+            '</Relationships>',
+        "xl/workbook.xml":
+            f'<?xml version="1.0"?><workbook xmlns="{ns}" xmlns:r="{rel}"><sheets>'
+            f'<sheet name="{esc(title)[:31]}" sheetId="1" r:id="rId1"/></sheets></workbook>',
+        "xl/_rels/workbook.xml.rels":
+            f'<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/'
+            f'relationships"><Relationship Id="rId1" Type="{rel}/worksheet" Target="worksheets/sheet1.xml"/>'
+            '</Relationships>',
+        "xl/worksheets/sheet1.xml":
+            f'<?xml version="1.0"?><worksheet xmlns="{ns}"><sheetData>{rows}</sheetData></worksheet>',
+    }
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, body in parts.items():
+            z.writestr(name, body)
 
 
 def selftest(rules):
-    schedule = draft(rules, 2026, 10)
+    year, month = 2026, 10
+    schedule = draft(rules, year, month)
     assert schedule, "empty schedule"
     seen = Counter()
     for slot, when, picks in schedule:
@@ -398,8 +454,18 @@ def selftest(rules):
         assert not days or mates, f"{a} scheduled without {b}"
     hog = [w for w, n in seen.items() if n > max(4, rules["rate"].get(w, 0) * 2)]
     assert not hog, f"over-booked: {hog}"
+    grid = to_grid(rules, schedule, year, month)
+    assert grid[0][0].endswith("OKTOBER 2026"), grid[0][0]
+    assert [h for h, _c in rules["layout"]["header"]] == \
+        [c for c in grid[1] if c], "header row does not match the sheet"
+    # The workbook we write has to be readable by the parser we already ship.
+    with tempfile.NamedTemporaryFile(suffix=".xlsx") as tmp:
+        to_xlsx(grid, tmp.name, "Test")
+        wb = Workbook(io.BytesIO(open(tmp.name, "rb").read()))
+        back = wb.grid(wb.sheets[0][1])
+    assert [r.get(1, "") for r in back] == [r[0] for r in grid], "xlsx round-trip lost a row"
     print(f"ok: {len(schedule)} tugas, {len(seen)} petugas, "
-          f"terbanyak {seen.most_common(1)[0]}")
+          f"terbanyak {seen.most_common(1)[0]}, xlsx bisa dibaca balik")
 
 
 def load_rules(path="rules.json"):
@@ -416,10 +482,16 @@ def main(argv):
                 blob = io.BytesIO(resp.read())
         json.dump(derive(blob), sys.stdout, ensure_ascii=False, indent=1)
         sys.stdout.write("\n")
-    elif argv[:1] == ["draft"] and len(argv) > 1:
+    elif argv[:1] in (["draft"], ["xlsx"]) and len(argv) > 1:
         year, month = (int(x) for x in argv[1].split("-"))
         rules = load_rules(argv[2] if len(argv) > 2 else "rules.json")
-        print(to_tsv(rules, draft(rules, year, month), year, month))
+        grid = to_grid(rules, draft(rules, year, month), year, month)
+        if argv[0] == "draft":
+            print(to_tsv(grid))
+        else:
+            out = argv[3] if len(argv) > 3 else f"jadwal-{year}-{month:02d}.xlsx"
+            to_xlsx(grid, out, f"{MONTHS[month]} {str(year)[2:]}")
+            print(out)
     elif argv[:1] == ["--selftest"]:
         selftest(load_rules(argv[1] if len(argv) > 1 else "rules.json"))
     else:

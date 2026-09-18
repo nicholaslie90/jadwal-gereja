@@ -2,3 +2,6 @@
 plain.json
 *.xlsx
 __pycache__/
+
+# Generated artefacts -- rebuild with scripts/roster.py and scripts/rules_pdf.py
+aturan-petugas-2026.pdf

@@ -47,6 +47,18 @@ lalu menyusun draft bulan baru.
 python3 scripts/roster.py derive > rules.json      # atau: derive sheet.xlsx
 python3 scripts/roster.py --selftest rules.json
 python3 scripts/roster.py draft 2026-10 rules.json # TSV, tempel ke Sheets
+python3 scripts/roster.py xlsx  2026-10 rules.json jadwal-oktober-2026.xlsx
+```
+
+Draft mengikuti layout tab terakhir (judul, kolom kembar Penyambut Tamu &
+Petugas Snack, tabel PBK/PAMS/PEMUDA di samping), jadi tinggal tempel.
+
+Ringkasan aturannya bisa dicetak jadi PDF -- satu-satunya skrip di sini yang
+butuh install (`weasyprint`, dan di macOS `brew install pango`):
+
+```sh
+DYLD_FALLBACK_LIBRARY_PATH=$(brew --prefix)/lib \
+  python3 scripts/rules_pdf.py rules.json aturan-petugas-2026.pdf
 ```
 
 `rules.json` cuma ringkasan sheet, boleh diedit tangan untuk menimpa apa pun
