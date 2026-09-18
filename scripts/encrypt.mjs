@@ -3,6 +3,7 @@
 // so this needs no npm install and mirrors exactly what the browser does to undo it.
 //
 //   node scripts/encrypt.mjs plain.json docs/data.json   # PAGE_PASSWORD from env
+//   node scripts/encrypt.mjs --decrypt rules.enc.json rules.json
 //   node scripts/encrypt.mjs --selftest
 
 import { webcrypto as crypto } from "node:crypto";
@@ -62,17 +63,27 @@ async function selftest() {
 async function main() {
   if (process.argv[2] === "--selftest") return selftest();
 
-  const [, , inPath, outPath] = process.argv;
+  const reverse = process.argv[2] === "--decrypt";
+  const [, , ...rest] = process.argv;
+  const [inPath, outPath] = reverse ? rest.slice(1) : rest;
   const password = process.env.PAGE_PASSWORD;
-  if (!inPath || !outPath) throw new Error("usage: encrypt.mjs <plain.json> <out.json>");
+  if (!inPath || !outPath) throw new Error("usage: encrypt.mjs [--decrypt] <in.json> <out.json>");
   if (!password) throw new Error("PAGE_PASSWORD is not set");
 
+  if (reverse) {
+    const payload = JSON.parse(readFileSync(inPath, "utf8"));
+    writeFileSync(outPath, await decrypt(payload, password));
+    console.log(`wrote ${outPath}`);
+    return;
+  }
+
   const plain = JSON.parse(readFileSync(inPath, "utf8"));
-  const generated = plain.generated;
-  // Hash the payload with `generated` removed, so a rebuild that finds an
+  const generated = plain.generated ?? plain.derived;
+  // Hash the payload with its timestamp removed, so a rebuild that finds an
   // unchanged roster is a no-op. Salt and IV are fresh every run, so without this
   // the ciphertext would differ daily and CI would commit noise forever.
   delete plain.generated;
+  delete plain.derived;
   const stable = JSON.stringify(plain);
   const hash = await digest(stable);
 
@@ -85,10 +96,14 @@ async function main() {
     return;
   }
 
-  plain.generated = generated;
+  if ("mine" in plain) plain.generated = generated;
+  else plain.derived = generated;
   const payload = await encrypt(JSON.stringify(plain), password);
   writeFileSync(outPath, JSON.stringify({ ...payload, hash, generated }, null, 1) + "\n");
-  console.log(`wrote ${outPath} (${plain.mine.length} duties, ${plain.months.length} months)`);
+  const what = plain.mine
+    ? `${plain.mine.length} duties, ${plain.months.length} months`
+    : `${Object.keys(plain.pools ?? {}).length} services of rules`;
+  console.log(`wrote ${outPath} (${what})`);
 }
 
 main().catch((err) => {

@@ -43,8 +43,14 @@ Node 20. Tidak ada `pip install`, tidak ada `npm install`.
 peran dan ibadah mana, pasangan tetap, seberapa sering tiap orang bertugas)
 lalu menyusun draft bulan baru.
 
+`rules.json` dan `aliases.json` menyebut nama jemaat, jadi yang masuk git cuma
+versi terenkripsinya (`*.enc.json`, password sama dengan halaman).
+
 ```sh
+node scripts/encrypt.mjs --decrypt aliases.enc.json aliases.json  # PAGE_PASSWORD
+node scripts/encrypt.mjs --decrypt rules.enc.json   rules.json
 python3 scripts/roster.py derive > rules.json      # atau: derive sheet.xlsx
+node scripts/encrypt.mjs rules.json rules.enc.json # setelah derive ulang
 python3 scripts/roster.py --selftest rules.json
 python3 scripts/roster.py draft 2026-10 rules.json # TSV, tempel ke Sheets
 python3 scripts/roster.py xlsx  2026-10 rules.json jadwal-oktober-2026.xlsx

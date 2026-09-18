@@ -1,7 +1,10 @@
 # Plaintext roster -- only the encrypted docs/data.json belongs in git.
 plain.json
+# Same reason: these name every volunteer. Committed encrypted (*.enc.json).
+rules.json
 *.xlsx
 __pycache__/
 
 # Generated artefacts -- rebuild with scripts/roster.py and scripts/rules_pdf.py
+aliases.json
 aturan-petugas-2026.pdf

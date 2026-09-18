@@ -36,24 +36,28 @@ SKIP = ("TGL", "HARI", "JAM", "ACARA")
 
 # One person, many spellings. Titles (Pdt/Dkn/Dks/Sdr) are stripped first, so
 # only the genuinely different spellings need a line here.
-ALIAS = {
-    "otniel": "Othniel", "hans": "Hans A", "ivan": "Ivan S", "ivan simadi": "Ivan S",
-    "eric": "Eric K", "erick k": "Eric K", "melia": "Meila", "cindy": "Cindy W",
-    "cindiana": "Cindiana W", "linda tj": "Linda Tg", "johon": "Johon L",
-    "lina y": "Lina Yong", "mey khim": "Mei Khim", "mei kim": "Mei Khim",
-    "yin yin": "Yin Yin", "yenny": "Yenny S", "yenny suryawan": "Yenny S",
-    "yenny surjawan": "Yenny S", "kefas": "Kefas J", "fanuel fang": "Fanuel",
-    "ng tjioe yung": "Ng Tjioe Yong", "steven x": "Steven Xie", "matthew": "Matthew Honggo",
-    "chandra": "Ronny Chandra", "ronny": "Ronny Chandra", "rony chandra": "Ronny Chandra",
-    "kwet kam": "Kwet Kam", "stevanie l": "Stevani L", "daniel": "Daniel (Dkn)",
-    "dk daniel": "Daniel (Dkn)", "jonathan": "Jonathan H", "fenny c": "Fenny",
-    "kevin g": "Kevin", "hana o": "Hana O", "lilik k": "Lilik", "james a": "James",
-}
+# Spelling variants live in aliases.json, which is encrypted in git for the
+# same reason rules.json is: it is a list of the congregation's names.
+# Missing file = every spelling is treated as its own person.
+ALIAS_FILE = "aliases.json"
 # Placeholders that sit in a person column but name an event or the congregation.
 NOT_A_PERSON = re.compile(
     r"^(KKR|KPI|PAMS|PEMUDA|RYF|Gereja|Fam Day|Sie\.?\s*Acara|Sabtu|Rabu|Jumat|\d)", re.I
 )
 TITLE = re.compile(r"^(Pdt|Pr|Dkn|Dks|Dk|Sdri|Sdr)\.?\s+", re.I)
+
+
+def aliases(path=None):
+    try:
+        with open(path or ALIAS_FILE, encoding="utf-8") as fh:
+            return json.load(fh)
+    except FileNotFoundError:
+        print(f"warning: {path or ALIAS_FILE} not found -- spellings will not be merged",
+              file=sys.stderr)
+        return {}
+
+
+ALIAS = {}
 
 
 def canon(raw):
@@ -475,6 +479,7 @@ def load_rules(path="rules.json"):
 
 def main(argv):
     if argv[:1] == ["derive"]:
+        ALIAS.update(aliases())
         if argv[1:]:
             blob = io.BytesIO(open(argv[1], "rb").read())
         else:
