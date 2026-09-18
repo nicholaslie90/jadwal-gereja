@@ -37,6 +37,22 @@ Node 20. Tidak ada `pip install`, tidak ada `npm install`.
 4. **Actions → Build jadwal → Run workflow** untuk build pertama. Centang
    *Kirim notifikasi percobaan* kalau mau sekalian menguji ntfy.
 
+## Menyusun jadwal bulan berikutnya
+
+`scripts/roster.py` membaca aturan langsung dari spreadsheet (siapa boleh di
+peran dan ibadah mana, pasangan tetap, seberapa sering tiap orang bertugas)
+lalu menyusun draft bulan baru.
+
+```sh
+python3 scripts/roster.py derive > rules.json      # atau: derive sheet.xlsx
+python3 scripts/roster.py --selftest rules.json
+python3 scripts/roster.py draft 2026-10 rules.json # TSV, tempel ke Sheets
+```
+
+`rules.json` cuma ringkasan sheet, boleh diedit tangan untuk menimpa apa pun
+(pool, kuota, pasangan, jumlah orang per sel). Yang tidak muncul 3 bulan
+terakhir dianggap pensiun dan tidak dijadwalkan lagi.
+
 ## Jalan lokal
 
 ```sh
