@@ -2,9 +2,9 @@
 plain.json
 # Same reason: these name every volunteer. Committed encrypted (*.enc.json).
 rules.json
+aliases.json
 *.xlsx
 __pycache__/
 
 # Generated artefacts -- rebuild with scripts/roster.py and scripts/rules_pdf.py
-aliases.json
 aturan-petugas-2026.pdf

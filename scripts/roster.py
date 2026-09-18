@@ -170,7 +170,7 @@ def derive(blob):
         template[slot][role] = Counter(seen.values()).most_common(1)[0][0]
 
     pools, rate, last_served, jam = defaultdict(lambda: defaultdict(Counter)), Counter(), {}, {}
-    # Spelling drifts ("Dkn Othniel" -> "Dk. Othniel"), so follow the newest months.
+    # Spelling drifts (a title gets abbreviated), so follow the newest months.
     spelling, recent_spelling = defaultdict(Counter), defaultdict(Counter)
     for _w, _s, _r, who, _j, raw in late:
         spelling[who][raw] += 1
@@ -183,7 +183,7 @@ def derive(blob):
             jam.setdefault(slot, Counter())[when_jam] += 1
 
     # Someone unseen for a quarter has moved, is ill or has handed the job over
-    # (Lydia -> Fenny on absensi, June 2026). Keep them out of next month.
+    # -- absensi changed hands that way in June 2026. Keep them out of next month.
     cutoff = date(*months[-ACTIVE], 1)
     retired = {w for w, d in last_served.items() if d < cutoff}
     for slot in pools:

@@ -132,8 +132,8 @@ Pengumuman + Penyambut Tamu). Generator sengaja tidak memakai ini.</li>
 
 <h2>4. Sudah tidak aktif (tidak dijadwalkan lagi)</h2>
 <p>Tidak muncul 3 bulan terakhir: {retired}.</p>
-<div class=note>Yang paling penting: <b>Lydia</b> memegang Absensi 46&times; (Jan–Mei) lalu berhenti Juni 2026.
-Penggantinya <b>Fenny</b>, dibantu Linda dan Lina Yong.</div>
+<div class=note>Perhatikan peran yang berpindah tangan: pemegang Absensi lama berhenti Juni 2026 dan
+digantikan orang lain, jadi pool Absensi di atas sudah yang terbaru, bukan yang Januari–Mei.</div>
 
 <h2>5. Daftar lengkap petugas aktif</h2>
 <table><tr><th>Nama</th><th>Tugas</th><th>Peran utama</th><th>Batasan ibadah</th><th>Rata2/bln</th></tr>{rows_people}</table>
@@ -142,10 +142,10 @@ Penggantinya <b>Fenny</b>, dibantu Linda dan Lina Yong.</div>
 <ul>
 <li><b>Tab JAN26 salah tahun:</b> nilai tanggalnya serial 2025 (2–31 Januari 2025) padahal isinya jadwal
 Januari 2026. Nama hari sudah benar. Sebaiknya diperbaiki di sheet.</li>
-<li>Ejaan disatukan: <code>Dkn/Dk./Dks + nama → nama</code>, <code>Linda Tj = Linda Tg</code>,
-<code>Yin-Yin = Yin Yin</code>, <code>Hans = Hans A</code>, <code>Ivan = Ivan S</code>, dsb.
-Masih ambigu: <b>"Linda"</b> (muncul sejak Juni) diperlakukan berbeda dari <b>"Linda Tg"</b>.
-<code>Dkn Daniel</code> &ne; <code>Daniel P</code>; <code>Cindy W</code> &ne; <code>Cindiana W</code>.</li>
+<li>Ejaan disatukan lewat <code>aliases.json</code>: gelar (Pdt/Dkn/Dks/Sdr) dibuang, tanda hubung dan
+singkatan marga disamakan. Dua nama depan yang sama dengan inisial marga berbeda tetap dianggap
+orang yang berbeda; satu nama depan yang kadang ditulis tanpa marga masih ambigu dan
+diperlakukan sebagai orang tersendiri.</li>
 <li>Penulis acara, bukan orang: <code>KKR</code>, <code>KPI</code>, <code>Gereja</code>, <code>RYF</code> — diabaikan.</li>
 </ul>
 
